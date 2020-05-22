@@ -5,7 +5,7 @@ import Clash.Prelude
 
 type Input = SensorInfo Set Vec Nat Float
            | Command Vec Nat Float
-           | Query
+           | Query String
 
 -- circut State
 type CState = CState {ekf :: EKFSLAM, partical :: FASTSLAM}
@@ -18,7 +18,18 @@ initalState :: CState
 initalState = 0
 
 mainT :: CState -> Input -> (CState,Output)
-mainT s i = (s,PureUpdate)
+mainT s i = (s',o)
+    where
+        s' = 
+            case i of
+                SensorInfo set -> s
+                Command u -> s
+                Query str -> s
+        o =
+            case i of
+                SensorInfo set -> PureUpdate
+                Command u -> Command ??
+                Query str -> Response str
 
 main = mealy mainT initalState
 
