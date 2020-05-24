@@ -1,0 +1,9 @@
+{
+  "FREQ" : "5",
+  "SIM_TIME" : "300",
+  "INITIAL_POSE" : ["0", "0", "0"],
+  "RANGE" : "1.5",
+  "SLAM_DIRECTORY" : "D:/SLAM/linalg_test",
+  "RANGE_ERROR" : 0.01,
+  "BARING_ERROR" :  0.0174532925199
+}

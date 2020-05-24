@@ -1,3 +1,6 @@
 *.hi
 *.o
 *.c
+output.json
+errors.txt
+run.csv

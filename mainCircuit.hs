@@ -3,33 +3,37 @@ module MainCircuit where
 import Clash.Prelude
 
 
-type Input = SensorInfo Set Vec Nat Float
-           | Command Vec Nat Float
+data Input = SensorInfo (Set Vec Nat Float) 
+           | BCommand (Vec Nat Float) -- command from brain
            | Query String
+           deriving (Show, Eq)
 
 -- circut State
-type CState = CState {ekf :: EKFSLAM, partical :: FASTSLAM}
+data CState = CState (EKFSLAM,FASTSLAM)
+                deriving (Show, Eq)
 
-type Output = Command (Float,Float)
+data Output = CCommand (Float,Float) -- controll command 
             | Response String
             | PureUpdate -- just an update of state, no output needed
+            deriving (Show, Eq)
 
 initalState :: CState
-initalState = 0
+-- initalState = CState {ekf = ?? , patical = ??}
 
 mainT :: CState -> Input -> (CState,Output)
-mainT s i = (s',o)
+mainT s (SensorInfo set) = (s',o)
     where
-        s' = 
-            case i of
-                SensorInfo set -> s
-                Command u -> s
-                Query str -> s
-        o =
-            case i of
-                SensorInfo set -> PureUpdate
-                Command u -> Command ??
-                Query str -> Response str
+        s'= s
+        o = PureUpdate
+
+mainT s (BCommand v) = (s',o)
+    where
+        s' = s
+        o  = CCommand (0,0)
+
+mainT s (Query str) = (s,o)
+    where
+        o = Response ""
 
 main = mealy mainT initalState
 
