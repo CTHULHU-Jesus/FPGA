@@ -2,14 +2,37 @@
 # useage: $ python viz.py *.json exampleInput.csv 
 # info: The json file should be formated like "example.json"
 #
-import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 import pandas as pd
-import sys
+import numpy as np
 import json
+import sys
 import ast
 
-colors = ["blue","orange"]
+
+def random_color():
+    colors = ["b","r",'c','g','m','y']
+    n = np.random.randint(len(colors))
+    return colors[n]
+
+def draw_ovel(ov,ax):
+    nstd=1
+    pos,cov = ov
+    vals, vecs = np.linalg.eig(cov)
+    # apparently numpy doesn't sort eigenvalues/eigenvectors
+    order = vals.argsort()[::-1]
+    vals = vals[order]
+    vecs = vecs[:, order]
+    theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+    w, h = nstd * np.sqrt(abs(vals))
+
+    ell = Ellipse(xy=(pos[0], pos[1]),
+                  width=w, height=h,
+                  angle=theta, color=random_color())
+    ell.set_alpha(0.1)
+    ax.add_artist(ell)
+
 
 def pi_to_pi(theta):
     return np.arctan2(np.sin(theta), np.cos(theta))
@@ -58,17 +81,32 @@ if __name__ == "__main__":
                 pointsSeenY.append(y)
 
         # unpack the json file
-        landMarksSeen = np.array(zip(map(np.array,filterOutputFile["positions"]),map(np.array,filterOutputFile["covariances"])))
+        # filterOutputFile["positions"] = list(map(np.array,filterOutputFile["positions"]))
+        # filterOutputFile["covariances"] = list(map(np.array,filterOutputFile["covariances"]))
+        landMarksSeen = np.array(list(zip(filterOutputFile["positions"],filterOutputFile["covariances"])))
         robotsPath = np.array(filterOutputFile["robotPos"])
         #start graphing
         fig, ax = plt.subplots()
+
+        # covariance ovels
+        for ov in landMarksSeen:
+            ov1,ov2 = ov
+            ov = np.array(ov1),np.array(list(map(np.array,ov2)))
+            print(ov)
+            draw_ovel(ov,ax)
+
         # observations
-        print(pointsSeenX,pointsSeenY)
         ax.scatter(pointsSeenX,pointsSeenY,s=0.1,c='gray', label="observations")
         ax.plot(desiredPathPointsX,desiredPathPointsY,c='black')
         #landmarks
         ax.scatter(landmarks[:,0],landmarks[:,1],c='black',label='landmarks')
 
+        #draw robot path
+        ax.plot(robotsPath[:,0],robotsPath[:,1],c='b')
+
+        
+
+        # finishing touches
         ax.set_aspect('equal')
         fig.tight_layout()
 
