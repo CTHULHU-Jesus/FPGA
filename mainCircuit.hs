@@ -1,15 +1,15 @@
 module MainCircuit where
 
 import Clash.Prelude
+import EKF as EFS
 
-
-data Input = SensorInfo (Set Vec Nat Float) 
-           | BCommand (Vec Nat Float) -- command from brain
+data Input = SensorInfo ((KnownNat n) => Vec n (Vec 2 Float)) 
+           | BCommand (Vec 3 Float) -- command from brain
            | Query String
            deriving (Show, Eq)
 
 -- circut State
-data CState = CState (EKFSLAM,FASTSLAM)
+data CState = CState (EKF.SLAM,FAST.SLAM)
                 deriving (Show, Eq)
 
 data Output = CCommand (Float,Float) -- controll command 

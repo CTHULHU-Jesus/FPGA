@@ -1,0 +1,5 @@
+*.dyn_*
+*.c
+*errors.txt
+*.hi
+*.o
