@@ -1,9 +1,12 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 module Matrix where
 
-import Clash.Prelude
+import Clash.Prelude hiding (transpose)
+import Clash.Prelude as TR (transpose)
 
-type Matrix m n t = Vec m (Vec n t)
+
+data Matrix m n t = Matrix (Vec m (Vec n t))
+                  deriving (Eq,Show)
 
 
 identity :: (Num t,KnownNat a,KnownNat b) => SNat a -> SNat b -> Matrix a b t
@@ -11,15 +14,17 @@ identity a b =
     let
         zero = replicate a (replicate b 0)
     in
-        imap (\i v -> replace i 1 v) zero
+        Matrix $ imap (\i v -> replace i 1 v) zero
 
 
-scaleM
-    :: (Num n,KnownNat a,KnownNat b) 
-    => n -> Matrix a b n 
-    -> Matrix a b n
-scaleM n mat =
-    mmap (n*) mat
+iimap 
+    :: (KnownNat r, KnownNat c)
+    => ((Index r,Index c) -> t1 -> t2)
+    -> Matrix r c t1 -> Matrix r c t2
+iimap f (Matrix m) =
+    Matrix $
+        imap (\i1 v -> imap (\i2 x -> f (i1,i2) x) v) m 
+
 
 vSlice 
     :: KnownNat n
@@ -35,7 +40,8 @@ mSlice
     => SNat f1 -> SNat l1
     -> SNat f2 -> SNat l2 
     -> Matrix (f1+l1+a) (f2+l2+b) t -> Matrix l1 l2 t
-mSlice f1 l1 f2 l2 mat =
+mSlice f1 l1 f2 l2 (Matrix mat) =
+    Matrix $
     map (vSlice f2 l2)
     . vSlice f1 l1 
     $ mat 
@@ -72,7 +78,7 @@ replaceSubMatrix
     => SNat x -> SNat y
     -> Matrix a b t -> Matrix (x+a+n1) (y+b+n2) t
     -> Matrix (x+a+n1) (y+b+n2) t
-replaceSubMatrix x y sub major =
+replaceSubMatrix x y sub (Matrix major) =
     let
         selector
             :: (KnownNat a,KnownNat b)
@@ -81,7 +87,7 @@ replaceSubMatrix x y sub major =
             => SNat y -> Matrix a b t 
             -> Index n -> Vec (y+b+l) t
             -> Vec (y+b+l) t
-        selector y m i r =
+        selector y (Matrix m) i r =
             let
                 i' = fromIntegral i
                 x' = snatToNum x
@@ -93,27 +99,48 @@ replaceSubMatrix x y sub major =
             else
                 r
     in
-    imap (selector y sub) major
+        Matrix $
+        imap (selector y sub) major
 
+-- zip to matraces of the same size together
 mZip 
     :: (KnownNat a,KnownNat b)
     => Matrix a b t1 -> Matrix a b t2
     -> Matrix a b(t1,t2)
-mZip m1 m2 =
+mZip (Matrix m1) (Matrix m2) =
+    Matrix $
         imap (\ i v -> zip (m1 !! fromIntegral i) v) m2
 
--- instance Functor (Matrix a b)  where
---      fmap f m = map (map f) m
+mmap f (Matrix m) = Matrix $ map (map f) m 
 
-mmap f m = map (map f) m 
+getVal 
+    :: KnownNat b => KnownNat a
+    => Matrix a b t -> (Nat,Nat)
+    -> t
+getVal (Matrix m) (x,y) = (m !! x) !! y
+
+( %% ) = getVal
+infixl 8 %%
+
+instance Functor (Matrix a b)  where
+     fmap = mmap
+
+instance (KnownNat a,KnownNat b) => Applicative (Matrix a b) where
+    pure a = Matrix $ repeat (repeat a)
+    f <*> (Matrix m) =
+        Matrix $ 
+        imap (\i1 v -> 
+                imap (\i2 x->
+                      (f %% (fromIntegral i1,fromIntegral i2)) x) v)
+        m
 
 instance (Num t,KnownNat a,KnownNat b) => Num (Matrix a b t ) where
-    negate = map (map negate)
-    (+) m1 m2 = mmap (\(a,b)-> a+b) (mZip m1 m2)
-    (*) m1 m2 = mmap (\(a,b)-> a*b) (mZip m1 m2)
-    fromInteger i = unconcatI $ fmap (\x->fromInteger i) indicesI :: Matrix a b t
-    abs = mmap abs
-    signum = mmap signum
+    negate = fmap negate
+    (+) m1 m2 = (\(a,b)-> a+b) <$> (mZip m1 m2)
+    (*) m1 m2 = (\(a,b)-> a*b) <$> (mZip m1 m2)
+    fromInteger i = pure $ fromInteger i
+    abs = fmap abs
+    signum = fmap signum
 
 -- the following algorithms were coppied from: https://clash-lang.org/blog/0001-matrix-multiplication/
 
@@ -142,7 +169,7 @@ mvMult
   -> Vec n t
   -- ^ Vector with `n` integers
   -> Vec m t
-mvMult mat vec = 
+mvMult (Matrix mat) vec = 
   map (dot vec) mat
 
 -- matrix matrix multiplication
@@ -157,5 +184,25 @@ mmMult
   => Matrix am an t
   -> Matrix bm bn t
   -> Matrix am bn t
-mmMult mat1 mat2 = 
-  map (mvMult (transpose mat2)) mat1
+mmMult (Matrix mat1) mat2 = 
+    Matrix $
+        map (mvMult $ Matrix.transpose mat2) mat1
+
+
+-- These are my own additions
+
+transpose (Matrix m) = Matrix $ TR.transpose m
+
+zeroI 
+    :: (KnownNat n,KnownNat m)
+    => Num t
+    => Matrix n m t
+zeroI = pure 0 
+
+-- infix notation for matrix multiplication
+( .@ ) = mvMult
+(  @. ) v m = (Matrix.transpose $ Matrix (v:>Nil)) .@. m
+( .@. ) = mmMult 
+infixl 7 .@. 
+infixl 7  @.
+infixl 7 .@
