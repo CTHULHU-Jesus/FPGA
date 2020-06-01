@@ -3,3 +3,6 @@
 *errors.txt
 *.hi
 *.o
+*/Matrix.hs
+*.out
+*/verilog
