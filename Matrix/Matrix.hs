@@ -1,17 +1,20 @@
-{-# LANGUAGE TypeSynonymInstances  #-}
+-- {-# LANGUAGE TypeSynonymInstances #-}
 module Matrix where
-
 
 -- I need to make my own transpose for
 -- matraces so I import the default one
 -- with the TR prefix
+-- import qualified Prelude as PPPP ()
 import Clash.Prelude hiding (transpose)
-import Clash.Prelude as TR (transpose)
+import qualified Clash.Prelude as TR (transpose)
+
+-- I need these for strings they are used anywhere other than show.
+import qualified Data.List as LIST
 
 -- A matrix is just a vector of vectors of some
 -- arbitrary types
 data Matrix m n t = Matrix (Vec m (Vec n t))
-                  deriving (Eq,Show)
+                    deriving (Eq)
 
 -- Create the identity matrix, the one that looks like:
 -- [ 1 , 0 , 0 ]
@@ -53,21 +56,25 @@ iimap f (Matrix m) =
 -- Example:
 -- vSlice 1 3 <1,2,3,4,5,6,7,8,9> = <2,3,4>
 vSlice 
-    :: KnownNat n
-    => KnownNat l
-    => CmpNat (n+l+1) l ~ GT
-    => Nat -> SNat l
+    -- :: KnownNat n
+    :: KnownNat l
+    => KnownNat (n+l)
+    => Int -> SNat l
     -> Vec (l+n) t -> Vec l t
+vSlice k l vs = 
+    map (\i -> vs !! (k+i)) $  iterate l (+1) (0 :: Int)
+    {-
 vSlice f l v =
     let
-        length :: Nat
+        length :: Int
         length = fromIntegral . snatToInteger $ l
-        fun :: (KnownNat a, KnownNat n) 
-            => Vec a t -> Index n 
-            -> nothingOfimport -> t 
-        fun v i _= v !! (f+length-(fromIntegral i)-1) 
+        fun :: KnownNat n
+            => Index n -> Int 
+        fun i = (f+length-(fromIntegral i)-1) 
     in
-        imap (fun v )$ repeat 0
+        imap (\i _ -> v !! (fun i)) $ replicate l 0
+-}
+
 
 -- Get a sub matrix fom a larger matrix.
 -- Example:
@@ -79,8 +86,8 @@ mSlice
     => (KnownNat l1,KnownNat l2)
     => CmpNat (a+l1+1) l1 ~ GT
     => CmpNat (b+l2+1) l2 ~ GT
-    => Nat -> SNat l1
-    -> Nat -> SNat l2 
+    => Int -> SNat l1
+    -> Int -> SNat l2 
     -> Matrix (l1+a) (l2+b) t -> Matrix l1 l2 t
 mSlice f1 l1 f2 l2 (Matrix mat) =
     Matrix $
@@ -101,7 +108,7 @@ mSlice f1 l1 f2 l2 (Matrix mat) =
 applyToSubMatrix :: (KnownNat m, KnownNat n)
                  => (KnownNat a, KnownNat b)
                  => (Matrix a b t -> Matrix a b t)
-                 -> Nat -> Nat
+                 -> Int -> Int
                  -> Matrix (a+m) (b+n) t
                  -> Matrix (a+m) (b+n) t
 applyToSubMatrix f row col mat =
@@ -117,7 +124,7 @@ applyToSubMatrix f row col mat =
 replaceSubVector
     :: KnownNat n
     => KnownNat a
-    => Nat -> Vec a t
+    => Int -> Vec a t
     -> Vec (a+n) t -> Vec (a+n) t
 replaceSubVector s sub major =
     let 
@@ -146,7 +153,7 @@ replaceSubVector s sub major =
 replaceSubMatrix 
     :: (KnownNat n1,KnownNat n2)
     => (KnownNat a,KnownNat b)
-    => Nat -> Nat
+    => Int -> Int
     -> Matrix a b t -> Matrix (a+n1) (b+n2) t
     -> Matrix (a+n1) (b+n2) t
 replaceSubMatrix x y sub (Matrix major) =
@@ -154,7 +161,7 @@ replaceSubMatrix x y sub (Matrix major) =
         selector
             :: (KnownNat a,KnownNat b)
             => (KnownNat n,KnownNat y)
-            => Nat -> Matrix a b t 
+            => Int -> Matrix a b t 
             -> Index n -> Vec (y+b) t
             -> Vec (y+b) t
         selector y (Matrix m) i r =
@@ -171,17 +178,17 @@ replaceSubMatrix x y sub (Matrix major) =
         imap (selector y sub) major
 
 
--- zipwith for matrixes
+-- zipWith for matrixes
 -- Example:
--- mZipwith + [ 1 , 2 ] [ 3 , 4 ] = [ 4 , 6 ]
+-- mZipWith + [ 1 , 2 ] [ 3 , 4 ] = [ 4 , 6 ]
 --            [ 2 , 1 ] [ 0 , 1 ]   [ 2 , 2 ]
-mZipwith
+mZipWith
     :: (KnownNat a, KnownNat b)
     => (t1 -> t2 -> t3) -> Matrix a b t1 
     -> Matrix a b t2 -> Matrix a b t3
-mZipwith f (Matrix m1) (Matrix m2) =
+mZipWith f (Matrix m1) (Matrix m2) =
     Matrix $
-        imap (λ i v -> zipwith f (m1 !! fromintegral i) v) m2
+        imap (\ i v -> zipWith f (m1 !! fromIntegral i) v) m2
 
 -- zip to matraces of the same size together
 mZip 
@@ -196,7 +203,7 @@ mmap f (Matrix m) = Matrix $ map (map f) m
 
 getVal 
     :: KnownNat b => KnownNat a
-    => Matrix a b t -> (Nat,Nat)
+    => Matrix a b t -> (Int,Int)
     -> t
 getVal (Matrix m) (x,y) = (m !! x) !! y
 
@@ -206,15 +213,15 @@ infixl 8 !!!
 sizeS :: (KnownNat a, KnownNat b)
       => Matrix a b t -> (SNat a, SNat b)
 sizeS (Matrix m) =
-    (lengthS m,length $ m !! 0)
+    (lengthS m,lengthS $ m !! 0)
 
 size :: (KnownNat a, KnownNat b)
-     => Matrix a b t -> (Nat, Nat)
+     => Matrix a b t -> (Int, Int)
 size m =
     let
         (a,b) = sizeS m
     in
-        (fromIntegral . snatToIntegral $ a,fromIntegral . snatToIntegral $ b)
+        (fromIntegral . snatToInteger $ a,fromIntegral . snatToInteger $ b)
 
 
 instance Functor (Matrix a b)  where
@@ -231,15 +238,37 @@ instance (KnownNat a,KnownNat b) => Applicative (Matrix a b) where
 
 instance (Num t,KnownNat a,KnownNat b) => Num (Matrix a b t ) where
     negate = fmap negate
-    (+) m1 m2 = mZipwith + m1 m2
-    (*) m1 m2 = mZipwith * m1 m2
+    (+) m1 m2 = mZipWith (+) m1 m2
+    (*) m1 m2 = mZipWith (*) m1 m2
     fromInteger i = pure $ fromInteger i
     abs = fmap abs
     signum = fmap signum
 
 instance (Show t,KnownNat a, KnownNat b) => Show (Matrix a b t) where
-    show (Matrix m) = 
-
+    show m =
+        let (Matrix vecs) = m in
+        let
+            row :: [t] -> String 
+            row v = case LIST.length v of
+                0 -> ""
+                1 -> show $ v LIST.!! 0
+                n | n > 1 -> (LIST.foldl (\ s e -> s LIST.++" ,"LIST.++show e ) "" . LIST.init $ v)
+                             LIST.++ (show . LIST.last $ v)
+        in
+        case fst . size $ m of
+            0 -> ""
+            1 -> "[["LIST.++(row . toList $ vecs !! 0 )LIST.++"]]"
+            2 -> "[["LIST.++(row . toList $ vecs !! 0 )LIST.++"],\n"LIST.++
+                 " ["LIST.++(row . toList $ vecs !! 1 )LIST.++"]]"
+            n -> 
+                let
+                    rows :: [String]
+                    rows = LIST.map (\ v -> "["LIST.++(row . toList $ v)LIST.++"]") . toList $ vecs
+                    h = "["LIST.++(LIST.head rows) LIST.++",\n"
+                    mid = LIST.map (\ r -> " "LIST.++r LIST.++",\n") . LIST.init . LIST.tail $ rows
+                    t = " "LIST.++ (LIST.last rows) LIST.++"]"
+                in
+                    LIST.foldl (LIST.++) "" $ h : mid LIST.++[t] 
 
 -- the following algorithms were coppied from: https://clash-lang.org/blog/0001-matrix-multiplication/
 
