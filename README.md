@@ -1,6 +1,4 @@
-# FPGASLAM
-SLAM for an FPGA written in clash.
+# FPGA
+A collection of FPGA tools. If you were directed here it was probably for the matrix library, you will find it under the directory Matrix and the file you are looking for is Matrix.hs.
 
-The current overall plan for the robot is described by the image below.
-
-![](plan.png)
+[comment]: <> (![](plan.png))

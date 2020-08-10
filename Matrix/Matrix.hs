@@ -24,9 +24,24 @@ data Matrix m n t = Matrix (Vec m (Vec n t))
 identity :: (Num t,KnownNat a,KnownNat b) => SNat a -> SNat b -> Matrix a b t
 identity a b =
     let
+        fun :: (KnownNat a,KnownNat b,Num t)
+            => (Index a, Index b) -> t
+            -> t
+        fun (i1,i2) _ =  if (toInteger i1 == toInteger i2) then 
+                            1
+                         else 
+                            0
+    in
+        iimap fun $ Matrix $ replicate a (replicate b 0)
+
+
+
+{- let
         zero = replicate a (replicate b 0)
     in
-        Matrix $ imap (\i v -> replace i 1 v) zero
+        Matrix $ imap (\i v -> if length v > i then replace i 1 v else v) zero
+-}
+
 
 -- The same as Identity but the size is deduced from context
 identityI :: (Num t, KnownNat a,KnownNat b) => Matrix a b t
@@ -54,7 +69,7 @@ iimap f (Matrix m) =
 
 -- Get a sub vector from a lager vector.
 -- Example:
--- vSlice 1 3 <1,2,3,4,5,6,7,8,9> = <2,3,4>
+-- vSlice 1 d3 <1,2,3,4,5,6,7,8,9> = <2,3,4>
 vSlice 
     -- :: KnownNat n
     :: KnownNat l
@@ -63,22 +78,10 @@ vSlice
     -> Vec (l+n) t -> Vec l t
 vSlice k l vs = 
     map (\i -> vs !! (k+i)) $  iterate l (+1) (0 :: Int)
-    {-
-vSlice f l v =
-    let
-        length :: Int
-        length = fromIntegral . snatToInteger $ l
-        fun :: KnownNat n
-            => Index n -> Int 
-        fun i = (f+length-(fromIntegral i)-1) 
-    in
-        imap (\i _ -> v !! (fun i)) $ replicate l 0
--}
-
 
 -- Get a sub matrix fom a larger matrix.
 -- Example:
--- mSlice 1 2 0 2 [ 0 , 1 , 2 ] = [ 3 , 4 ]
+-- mSlice 1 d2 0 d2 [ 0 , 1 , 2 ] = [ 3 , 4 ]
 --                [ 3 , 4 , 5 ]   [ 6 , 7 ]
 --                [ 6 , 7 , 8 ]
 mSlice
