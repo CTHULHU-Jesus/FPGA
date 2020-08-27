@@ -337,3 +337,79 @@ zeroI = pure 0
 infixl 7 .@. 
 infixl 7  @.
 infixl 7 .@
+
+-- get the lenght from tip to tail of a vector in euclindian space
+edist :: (Floating n, 1 <= a,KnownNat a) => Vec a n -> n
+edist v = sqrt $ v `dot` v
+
+
+-- foldl over a matrix
+mFoldl :: (t -> t -> t) -> t -> Matrix a b t -> t
+mFoldl f i (Matrix v) =
+    foldl f i (concat v)
+
+abj :: (Num a, KnownNat n, 1 <= n) => Matrix n n a -> Matrix n n a
+abj m =
+    let
+        -- f :: Num a => (Index n,Index n) -> a -> a
+        f (ri,ci) _ = 
+            let 
+                n1 = (-1)^(fromIntegral $ ri+ci)
+                n2 = det (removeColumn ci (removeRow ri m))
+            in
+                n1 * n2
+    in
+        if (fst . sizeS $ m) == 1 then
+            identity d1 d1
+        else
+            iimap f zeroI
+
+
+-- matrix determinant
+det :: (Num a, 1 <= n,KnownNat n) => Matrix n n a -> a
+det m@(Matrix v) =
+    let
+        v1 = v !! 0
+        (Matrix v2) = (transpose . abj $ m)
+        v2' = v2 !! 0
+    in
+        v1 `dot` v2'
+    {- if size m == (1,1) then
+        m !!! (0,0)
+    else
+        if size m == (2,2) then
+            let
+                a = m !!! (0,0)
+                b = m !!! (0,1)
+                c = m !!! (1,0)
+                d = m !!! (1,1)
+            in
+                a*d-b*c
+        else
+            mFoldl (+) 0 $
+            iimap (\(ir,ic) val -> 
+                if ir == 0 then
+                    if odd ic then
+                        -val*det (removeColumn ic $ removeRow 0 m)
+                    else
+                        val*det (removeColumn ic $  removeRow 0 m)
+                else
+                    0) m
+-}
+
+removeColumn :: (KnownNat a,KnownNat b,1 <= b) => Index b -> Matrix a b t ->  Matrix a (b-1) t
+removeColumn i m  =
+    transpose $ removeRow i (transpose m)
+
+
+removeRow :: (1 <= a,KnownNat a, KnownNat b) => Index a -> Matrix a b t -> Matrix (a-1) b t
+removeRow i1 m@(Matrix v) =
+   let
+           (r,c) = sizeS m
+           f (ri,ci) _ = 
+            if (fromIntegral ri) >= (fromIntegral i1) then
+                m !!! (fromIntegral ri+1,fromIntegral ci)
+            else
+                m !!! (fromIntegral ri, fromIntegral ci)
+    in
+        iimap f (identity (predSNat r) c)
